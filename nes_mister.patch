@@ -1,0 +1,838 @@
+Xilinx Vivado / standard HDL compatibility fixes for NES_MiSTer.
+Applied to a copy of the nes_mister submodule by scripts/prepare_rtl.py.
+
+* Signals assigned in always blocks are declared 'logic' instead of 'wire'
+  (Quartus accepts procedural assignments to nets; Vivado and the SystemVerilog
+  standard do not).
+* Combinational 'always begin' blocks without an event control are written as
+  'always @* begin' (Quartus infers this, Vivado only warns).
+* Files using the savestate register package import it themselves, instead
+  of relying on ppu.sv's import in a shared compilation unit.
+* VM2413 (VRC7 audio): case statements get 'when others' choices, and arrays
+  indexed by an integer subtype use 'low to 'high instead of 'range.
+
+diff -ru a/rtl/apu.sv b/rtl/apu.sv
+--- a/rtl/apu.sv	2026-09-26 15:45:25.082669585 -0700
++++ b/rtl/apu.sv	2026-09-26 15:45:25.087067510 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // Rewritten 6/4/2020 by Kitrinx
+ // This code is GPLv3.
+ 
+diff -ru a/rtl/cart.sv b/rtl/cart.sv
+--- a/rtl/cart.sv	2026-09-26 15:45:25.082724659 -0700
++++ b/rtl/cart.sv	2026-09-26 15:45:25.087133635 -0700
+@@ -2512,7 +2512,7 @@
+ );
+ 
+ 
+-wire [1023:0] me;
++logic [1023:0] me;
+ 
+ always @* begin
+ 	me = 1024'd0;
+diff -ru a/rtl/cheatcodes.sv b/rtl/cheatcodes.sv
+--- a/rtl/cheatcodes.sv	2026-09-26 15:45:25.082776506 -0700
++++ b/rtl/cheatcodes.sv	2026-09-26 15:45:25.087186024 -0700
+@@ -15,8 +15,8 @@
+ 	input  [ADDR_WIDTH - 1:0] addr_in,
+ 	input  [DATA_WIDTH - 1:0] data_in,
+ 	input  [128:0] code,
+-	output genie_ovr,
+-	output [DATA_WIDTH - 1:0] genie_data
++	output logic genie_ovr,
++	output logic [DATA_WIDTH - 1:0] genie_data
+ );
+ 
+ parameter ADDR_WIDTH   = 16; // Not more than 32
+diff -ru a/rtl/EEPROM_24C0x.sv b/rtl/EEPROM_24C0x.sv
+--- a/rtl/EEPROM_24C0x.sv	2026-09-26 15:45:25.082014561 -0700
++++ b/rtl/EEPROM_24C0x.sv	2026-09-26 15:45:25.086149631 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // 24C01, 24C02 EEPROM support
+ // by GreyRogue for NES MiSTer
+ 
+diff -ru a/rtl/mappers/FDS.sv b/rtl/mappers/FDS.sv
+--- a/rtl/mappers/FDS.sv	2026-09-26 15:45:25.083093764 -0700
++++ b/rtl/mappers/FDS.sv	2026-09-26 15:45:25.089871834 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ //Famicom Disk System
+ 
+ module MapperFDS(
+@@ -714,7 +715,7 @@
+ // Volume math
+ wire [11:0] mul_out = wave_latch * (vol_pwm_lat[5] ? 6'd32 : vol_pwm_lat);
+ 
+-wire [15:0] level_out;
++logic [15:0] level_out;
+ assign audio_out = level_out[11:0];
+ 
+ always_comb begin
+diff -ru a/rtl/mappers/generic.sv b/rtl/mappers/generic.sv
+--- a/rtl/mappers/generic.sv	2026-09-26 15:45:25.083448432 -0700
++++ b/rtl/mappers/generic.sv	2026-09-26 15:45:25.090361737 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // These mappers are simple generic mappers which can eventually be combined into a single module with parameters
+ 
+ // No mapper chip -- NOT currently used (Mapper28 is used for mapper 0)
+@@ -237,7 +238,7 @@
+ assign SS_MAP1_BACK[ 9: 8] = write_state;
+ assign SS_MAP1_BACK[63:10] = 54'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	// mirroring mode
+ 	casez({flags[16], flags[14]})
+ 		3'b00   :   vram_a10 = chr_ain[11];    // horizontal
+@@ -583,7 +584,7 @@
+ assign SS_MAP1_BACK[63: 5] = 59'b0; // free to be used
+ 
+ reg [3:0] prgout;
+-always begin
++always @* begin
+ 	casez({prg_ain[14], mapper232})
+ 		2'b0?: prgout = prg_bank;
+ 		2'b10: prgout = 4'b1111;
+@@ -683,7 +684,7 @@
+ assign SS_MAP1_BACK[ 7: 4] = chrbank;
+ assign SS_MAP1_BACK[63: 8] = 56'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	vram_a10 = {chr_ain[10]};    // four screen (consecutive)
+ end
+ 
+@@ -801,7 +802,7 @@
+ 
+ // The a10 VRAM address line. (Used for mirroring)
+ reg vram_a10_t;
+-always begin
++always @* begin
+ 	case({onescreen, vmirror})
+ 		2'b00: vram_a10_t = chr_ain[11];   // One screen, horizontal
+ 		2'b01: vram_a10_t = chr_ain[10];   // One screen, vertical
+@@ -1016,7 +1017,7 @@
+ assign SS_MAP1_BACK[   11] = mirror;
+ assign SS_MAP1_BACK[63:12] = 52'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	// mirroring mode
+ 	casez({mapper89,flags[14]})
+ 		2'b00   :   vram_a10 = {chr_ain[11]};    // horizontal
+@@ -1278,7 +1279,7 @@
+ assign SS_MAP1_BACK[24:23] = a53chr;
+ assign SS_MAP1_BACK[63:25] = 39'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	// mirroring mode
+ 	casez(mode[1:0])
+ 		2'b0? : vram_a10 = {mode[0]};        // 1 screen lower
+diff -ru a/rtl/mappers/JYCompany.sv b/rtl/mappers/JYCompany.sv
+--- a/rtl/mappers/JYCompany.sv	2026-09-26 15:45:25.083140542 -0700
++++ b/rtl/mappers/JYCompany.sv	2026-09-26 15:45:25.089944671 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // J. Y. Company mappers
+ 
+ module multiplier (
+@@ -102,7 +103,7 @@
+ reg [21:0] chr_aout;
+ wire prg_allow;
+ wire chr_allow;
+-wire vram_a10;
++logic vram_a10;
+ reg [7:0] chr_dout, prg_dout;
+ wire vram_ce;
+ wire [15:0] flags_out = {12'h0, 1'b1, 1'b0, prg_bus_write, 1'b0};
+@@ -137,7 +138,7 @@
+ 
+ reg old_a12;
+ reg irq_enable;
+-wire irq_source;
++logic irq_source;
+ assign irq = irq_pending && irq_enable;
+ reg irq_pending;
+ reg irq_en;
+@@ -336,7 +337,7 @@
+ end
+ 
+ // Compute PRG address to read from.
+-wire [1:0] prg_reg;
++logic [1:0] prg_reg;
+ always @* begin
+ 	casez({prg_6xxx, bank_mode[1:0]})
+ 		3'b000: prg_reg = {2'b11};                       // $8000-$FFFF
+@@ -347,7 +348,7 @@
+ end
+ wire [7:0] bank_val = (!bank_mode[2] && prg_reg == 2'b11) ? 8'hFF : prg_bank[prg_reg];
+ wire [6:0] bank_order = bank_mode[1:0] == 2'b11 ? {bank_val[0], bank_val[1], bank_val[2], bank_val[3], bank_val[4], bank_val[5], bank_val[6]} : bank_val[6:0];
+-wire [5:0] prg_sel;
++logic [5:0] prg_sel;
+ always @* begin
+ 	casez({prg_6xxx, bank_mode[1:0]})
+ 		3'b000: prg_sel = {bank_order[3:0], prg_ain[14:13]}; //
+@@ -370,7 +371,7 @@
+ end else if (~paused && chr_read) begin
+ 	chr_latch[chr_ain_o[12]] <= outer_bank[7] && (((chr_ain_o & 14'h2ff8) == 14'h0fd8) ? 1'd0 : ((chr_ain_o & 14'h2ff8) == 14'h0fe8) ? 1'd1 : chr_latch[chr_ain_o[12]]);
+ end
+-wire [2:0] chr_reg;
++logic [2:0] chr_reg;
+ always @* begin
+ 	casez(bank_mode[4:3])
+ 		2'b00: chr_reg = {3'b000};                                   // $0000-$1FFF
+@@ -380,7 +381,7 @@
+ 	endcase
+ end
+ wire [12:0] chr_val = chr_bank[chr_reg][12:0];
+-wire [12:0] chr_sel;
++logic [12:0] chr_sel;
+ always @* begin
+ 	casez({romtables, bank_mode[4:3]})
+ 		3'b000: chr_sel = {chr_val[9:0],  chr_ain[12:10]};    //
+diff -ru a/rtl/mappers/misc.sv b/rtl/mappers/misc.sv
+--- a/rtl/mappers/misc.sv	2026-09-26 15:45:25.083507764 -0700
++++ b/rtl/mappers/misc.sv	2026-09-26 15:45:25.090552767 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // These are misc small one-off mappers. Some may end up being merged with Generic mappers.
+ // altera message_off 10027
+ // #15 -  100-in-1 Contra Function 16
+@@ -77,7 +78,7 @@
+ end
+ 
+ reg [6:0] prg_bank;
+-always begin
++always @* begin
+ 	casez({prg_rom_bank_mode, prg_ain[14]})
+ 		// Bank mode 0 ( 32K ) / CPU $8000-$BFFF: Bank B / CPU $C000-$FFFF: Bank (B OR 1)
+ 		3'b00_0: prg_bank = {prg_rom_bank, prg_ain[13]};
+@@ -282,7 +283,7 @@
+ assign SS_MAP2_BACK[   47] = eeprom_sda;
+ assign SS_MAP2_BACK[63:48] = 16'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	// mirroring
+ 	casez(mirroring[1:0])
+ 		2'b00:   vram_a10 = {chr_ain[10]};    // vertical
+@@ -292,7 +293,7 @@
+ end
+ 
+ reg [4:0] prgsel;
+-always begin
++always @* begin
+ 	case(prg_ain[15:14])
+ 		2'b10: 	 prgsel = {outer_prg_bank, inner_prg_bank};  // $8000 is swapable
+ 		2'b11: 	 prgsel = {outer_prg_bank, 4'hF};            // $C000 is hardwired to last inner bank
+@@ -301,7 +302,7 @@
+ end
+ 
+ reg [7:0] chrsel;
+-always begin
++always @* begin
+ 	casez(chr_ain[12:10])
+ 		0: chrsel = chr_bank_0;
+ 		1: chrsel = chr_bank_1;
+@@ -567,7 +568,7 @@
+ assign SS_MAP3_BACK[ 1: 0] = ram_enable;
+ assign SS_MAP3_BACK[63: 2] = 62'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	// mirroring
+ 	casez(mirroring[1:0])
+ 		2'b00: vram_a10 = {chr_ain[11]};    // horizontal
+@@ -577,7 +578,7 @@
+ end
+ 
+ reg [7:0] prgsel;
+-always begin
++always @* begin
+ 	case(prg_ain[14:13])
+ 		2'b00: prgsel = prg_bank_0;      // $8000 is swapable
+ 		2'b01: prgsel = prg_bank_1;      // $A000 is swapable
+@@ -587,7 +588,7 @@
+ end
+ 
+ reg [7:0] chrsel;
+-always begin
++always @* begin
+ 	casez(chr_ain[12:10])
+ 	0: chrsel = chr_bank_0;
+ 	1: chrsel = chr_bank_1;
+@@ -742,7 +743,7 @@
+ assign SS_MAP2_BACK[   11] = mirror;
+ assign SS_MAP2_BACK[63:12] = 52'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	// mirroring mode
+ 	casez({submapper1, mirror})
+ 		2'b00   :   vram_a10 = {chr_ain[10]};    // vertical
+@@ -1203,12 +1204,12 @@
+ assign SS_MAP2_BACK[   59] = mirroring;
+ assign SS_MAP2_BACK[63:60] = 4'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	vram_a10 = mirroring ? chr_ain[11] : chr_ain[10];    // horizontal:vertical
+ end
+ 
+ reg [7:0] prgsel;
+-always begin
++always @* begin
+ 	case(prg_ain[14:13])
+ 		2'b00: prgsel = prg_bank_0;      // $8000 is swapable
+ 		2'b01: prgsel = prg_bank_1;      // $A000 is swapable
+@@ -1218,7 +1219,7 @@
+ end
+ 
+ reg [7:0] chrsel;
+-always begin
++always @* begin
+ 	casez(chr_ain[12:10])
+ 		0: chrsel = chr_bank_0;
+ 		1: chrsel = chr_bank_1;
+@@ -1598,7 +1599,7 @@
+ 	end
+ end
+ 
+-always begin
++always @* begin
+ 	case(prg_ain[14:13])
+ 		2'b00:  prgsel = prg_bank0;
+ 		2'b01:  prgsel = prg_bank1;
+@@ -1781,7 +1782,7 @@
+ reg [7:0] state[4];
+ 
+ // register 0x5000 to 0x5FFF
+-wire [7:0] prg_bank;
++logic [7:0] prg_bank;
+ 
+ always_comb begin
+ 	case ({state[3][2], 1'b0, state[3][0]})
+@@ -2628,7 +2629,7 @@
+ assign exp_audioe   = enable ? (nsf_reg[3][5:0]==6'd0) ? ({2'b00,midi_reg[5'd7][3],3'b000}) : nsf_reg[3][5:0] : 6'h00;
+ 
+ wire [21:0] prg_aout, chr_aout;
+-wire [7:0] prg_dout;
++logic [7:0] prg_dout;
+ wire prg_allow;
+ wire chr_allow;
+ wire vram_a10;
+@@ -2766,8 +2767,8 @@
+ 	end
+ end
+ 
+-wire [9:0] prg_bank;
+-always begin
++logic [9:0] prg_bank;
++always @* begin
+ 	casez({prg_ain[15:12], exp_audioe[2]})
+ 		5'b00???: prg_bank = 10'h0;//{10'b11_1110_0000};
+ 		5'b0100?: prg_bank = 10'h0;//{10'b11_1110_0000};
+@@ -2862,8 +2863,8 @@
+ wire [4:0] freq = nois ? n_freq : samp ? s_freq : ms_freq;
+ wire use_freq = nois | samp | m5samp;
+ 
+-wire [4:0] voi_tab_idx;
+-always begin
++logic [4:0] voi_tab_idx;
++always @* begin
+ 	casez({n163_max,exp_audioe,ppu_line}) //6,5
+ 		12'b???????_000??: voi_tab_idx = 5'd0;  //Info;
+ 		12'b???????_001??: voi_tab_idx = {4'd0,ppu_line[1]}; //Apu;
+@@ -2940,7 +2941,7 @@
+ wire use1615 = use_n163;
+ wire [11:0] period_use = use1615? period1615 : use78 ? period78 : period[find_idx];
+ 
+-wire [17:0] find_bits;
++logic [17:0] find_bits;
+ 	logic [10:0] find_note_lut[80];  //not used; done in asm
+ 	assign find_note_lut = '{
+ 		11'h7f1,11'h77f,11'h713,11'h6ad,11'h64d,11'h5f3,11'h59d,11'h54c,
+@@ -2967,7 +2968,7 @@
+ 		10'h000, 10'h000, 10'h000, 10'h000
+ 	};
+ 
+-always begin
++always @* begin
+ 	casez(period_use[11:2])
+ 		10'b1???_????_??: find_bits = {4'd8,4'd0,period_use[10:1]};
+ 		10'b01??_????_??: find_bits = {4'd7,4'd1,period_use[9:0]};
+@@ -2993,7 +2994,7 @@
+ 	end
+ end
+ 
+-always begin
++always @* begin
+ 	prg_bus_write = 1'b1;
+ 	if (prg_ain == 16'h5205) begin
+ 		prg_dout = multiply_result[7:0];
+@@ -3246,7 +3247,7 @@
+ wire [21:0] prg_aout, chr_aout;
+ reg [7:0] prg_dout;
+ wire prg_allow, chr_allow;
+-wire vram_ce, vram_a10;
++logic vram_ce, vram_a10;
+ wire [15:0] audio = audio_in;
+ wire [15:0] flags_out = {14'h0, prg_bus_write, 1'h0};
+ wire prg_bus_write;
+diff -ru a/rtl/mappers/MMC1.sv b/rtl/mappers/MMC1.sv
+--- a/rtl/mappers/MMC1.sv	2026-09-26 15:45:25.083168164 -0700
++++ b/rtl/mappers/MMC1.sv	2026-09-26 15:45:25.090610325 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // MMC1 mapper chip. Maps prg or chr addresses into a linear address.
+ 
+ // If vram_ce is set, {vram_a10, chr_aout[9:0]} are used to access the NES internal VRAM instead.
+@@ -301,7 +302,7 @@
+ // In the official tournament, 'C' was closed, and the others were open, so the counter had to reach $2800000.
+ assign irq = (counter[29:25] == 5'b10100);
+ 
+-always begin
++always @* begin
+ 	if (!prg_ain[15]) begin
+ 		// WRAM is always routed as usual (8KB).
+ 		prg_aout = { mmc1_aout[21:15], 2'b00, prg_ain[12:0] };
+diff -ru a/rtl/mappers/MMC2.sv b/rtl/mappers/MMC2.sv
+--- a/rtl/mappers/MMC2.sv	2026-09-26 15:45:25.083193692 -0700
++++ b/rtl/mappers/MMC2.sv	2026-09-26 15:45:25.090042676 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // MMC 2 and 4 mappers. These can probably be consolidated.
+ 
+ // MMC2 mapper chip. PRG ROM: 128kB. Bank Size: 8kB. CHR ROM: 128kB
+diff -ru a/rtl/mappers/MMC3.sv b/rtl/mappers/MMC3.sv
+--- a/rtl/mappers/MMC3.sv	2026-09-26 15:45:25.083221996 -0700
++++ b/rtl/mappers/MMC3.sv	2026-09-26 15:45:25.090090927 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // MMC3 style mappers. Some of these can probably be consolidated.
+ 
+ // iNES mapper 64 and 158 - Tengen's version of MMC3
+diff -ru a/rtl/mappers/MMC5.sv b/rtl/mappers/MMC5.sv
+--- a/rtl/mappers/MMC5.sv	2026-09-26 15:45:25.083263053 -0700
++++ b/rtl/mappers/MMC5.sv	2026-09-26 15:45:25.090160548 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // MMC5 Mapper aka "WTF were they thinking?!"
+ 
+ module MMC5(
+@@ -43,7 +44,7 @@
+ 	input         Savestate_MAPRAMRdEn,
+ 	input         Savestate_MAPRAMWrEn,
+ 	input  [7:0]  Savestate_MAPRAMWriteData,
+-	output [7:0]  Savestate_MAPRAMReadData
++	output logic [7:0]  Savestate_MAPRAMReadData
+ );
+ 
+ assign prg_aout_b   = enable ? prg_aout : 22'hZ;
+@@ -68,7 +69,7 @@
+ wire vram_ce;
+ wire [15:0] flags_out = {12'h0, 1'b1, 1'b0, prg_bus_write, has_chr_dout};
+ wire irq;
+-wire prg_bus_write, has_chr_dout;
++logic prg_bus_write, has_chr_dout;
+ wire [15:0] audio = audio_in;
+ 
+ reg [1:0] prg_mode, chr_mode;
+diff -ru a/rtl/mappers/Namco.sv b/rtl/mappers/Namco.sv
+--- a/rtl/mappers/Namco.sv	2026-09-26 15:45:25.083318577 -0700
++++ b/rtl/mappers/Namco.sv	2026-09-26 15:45:25.090256268 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // Namco mappers
+ 
+ module N163(
+@@ -483,7 +484,7 @@
+ 	input         Savestate_MAPRAMRdEn,    
+ 	input         Savestate_MAPRAMWrEn,    
+ 	input  [7:0]  Savestate_MAPRAMWriteData,
+-	output [7:0]  Savestate_MAPRAMReadData
++	output logic [7:0]  Savestate_MAPRAMReadData
+ );
+ 
+ reg carry;
+diff -ru a/rtl/mappers/Sachen.sv b/rtl/mappers/Sachen.sv
+--- a/rtl/mappers/Sachen.sv	2026-09-26 15:45:25.083348023 -0700
++++ b/rtl/mappers/Sachen.sv	2026-09-26 15:45:25.090297325 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // Sachen Mappers
+ 
+ // 137, 138, 139, 141 - Sachen 8259
+@@ -47,7 +48,7 @@
+ wire [21:0] prg_aout, chr_aout;
+ wire prg_allow;
+ wire chr_allow;
+-wire vram_a10;
++logic vram_a10;
+ wire vram_ce;
+ wire [15:0] flags_out = {12'd0, 1'b1, 1'b0, prg_bus_write, 1'b0};
+ 
+@@ -113,8 +114,8 @@
+ assign SS_MAP1_BACK[63:27] = 37'b0; // free to be used
+ 
+ // The CHR bank to load. Each increment here is 1kb. So valid values are 0..255.
+-wire [2:0] chr_bank;
+-wire [2:0] chr_banko;
++logic [2:0] chr_bank;
++logic [2:0] chr_banko;
+ reg [8:0] chrsel;
+ always @* begin
+ 	casez({mirroring[0], mapper137 ? chr_ain[11:10] : chr_ain[12:11]})
+diff -ru a/rtl/mappers/Sunsoft.sv b/rtl/mappers/Sunsoft.sv
+--- a/rtl/mappers/Sunsoft.sv	2026-09-26 15:45:25.083375665 -0700
++++ b/rtl/mappers/Sunsoft.sv	2026-09-26 15:45:25.089991619 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // 69 - Sunsoft FME-7
+ module Mapper69(
+ 	input        clk,         // System clock
+@@ -148,7 +149,7 @@
+ assign SS_MAP2_BACK[   46] = irq;
+ assign SS_MAP2_BACK[63:47] = 17'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	casez(mirroring[1:0])
+ 		2'b00: vram_a10 = {chr_ain[10]};    // vertical
+ 		2'b01: vram_a10 = {chr_ain[11]};    // horizontal
+@@ -159,7 +160,7 @@
+ reg [4:0] prgout;
+ reg [7:0] chrout;
+ 
+-always begin
++always @* begin
+ 	casez(prg_ain[15:13])
+ 		3'b011: prgout = prg_bank[0];
+ 		3'b100: prgout = prg_bank[1];
+@@ -394,7 +395,7 @@
+ 
+ end
+ 
+-wire output_a, output_b, output_c;
++logic output_a, output_b, output_c;
+ 
+ always_comb begin
+ 	case ({tone_dis_a, noise_dis_a})
+@@ -529,7 +530,7 @@
+ wire [21:0] prg_aout, chr_aout;
+ wire prg_allow;
+ wire chr_allow;
+-wire vram_a10;
++logic vram_a10;
+ wire vram_ce;
+ reg irq;
+ reg [15:0] flags_out = {12'h0, 1'b1, 3'b0};
+@@ -615,7 +616,7 @@
+ assign SS_MAP1_BACK[   61] = irq;
+ assign SS_MAP1_BACK[63:62] = 2'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	casez({mirroring})
+ 		2'b00   :   vram_a10 = {chr_ain[10]};    // vertical
+ 		2'b01   :   vram_a10 = {chr_ain[11]};    // horizontal
+@@ -624,7 +625,7 @@
+ end
+ 
+ reg [7:0] prgsel;
+-always begin
++always @* begin
+ 	case(prg_ain[14])
+ 	1'b0: prgsel = prg_bank_0;                // $8000 is swapable
+ 	1'b1: prgsel = mapper190 ? 8'h00 : 8'hFF; // $C000 is hardwired to first/last bank
+@@ -632,7 +633,7 @@
+ end
+ 
+ reg [7:0] chrsel;
+-always begin
++always @* begin
+ 	casez(chr_ain[12:11])
+ 		0: chrsel = chr_bank_0;
+ 		1: chrsel = chr_bank_1;
+@@ -709,9 +710,9 @@
+ 
+ wire [21:0] prg_aout, chr_aout;
+ wire prg_allow;
+-wire ram_enable;
++logic ram_enable;
+ wire chr_allow;
+-wire vram_a10;
++logic vram_a10;
+ wire vram_ce;
+ reg [15:0] flags_out = {12'h0, 1'b1, 3'b0};
+ 
+@@ -777,7 +778,7 @@
+ assign prg_allow = (prg_ain[15] && !prg_write) || (prg_is_ram && ram_enable);
+ 
+ reg [6:0] chrout;
+-always begin
++always @* begin
+ 	casez(chr_ain[12:11])
+ 		0: chrout = chr_bank_0;
+ 		1: chrout = chr_bank_1;
+@@ -786,7 +787,7 @@
+ 	endcase
+ end
+ 
+-always begin
++always @* begin
+ 	casez(mirroring[1:0])
+ 		2'b00: vram_a10 = {chr_ain[10]};    // vertical
+ 		2'b01: vram_a10 = {chr_ain[11]};    // horizontal
+diff -ru a/rtl/mappers/VRC.sv b/rtl/mappers/VRC.sv
+--- a/rtl/mappers/VRC.sv	2026-09-26 15:45:25.083406503 -0700
++++ b/rtl/mappers/VRC.sv	2026-09-26 15:45:25.090325949 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // Konami VRC Mappers
+ 
+ // VRC1 (75)
+@@ -46,7 +47,7 @@
+ wire [21:0] prg_aout, chr_aout;
+ wire prg_allow;
+ wire chr_allow;
+-wire vram_a10;
++logic vram_a10;
+ wire vram_ce;
+ reg [15:0] flags_out = {12'h0, 1'b1, 3'b0};
+ 
+@@ -88,7 +89,7 @@
+ assign SS_MAP1_BACK[23:22] = mirroring;
+ assign SS_MAP1_BACK[63:24] = 40'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	// mirroring mode
+ 	casez(mirroring[1:0])
+ 		2'b00   :   vram_a10 = {chr_ain[10]};    // vertical
+@@ -305,7 +306,7 @@
+ wire [21:0] prg_aout, chr_aout;
+ wire prg_allow;
+ wire chr_allow;
+-wire vram_a10;
++logic vram_a10;
+ wire vram_ce;
+ wire irq;
+ reg [15:0] flags_out = {12'h0, 1'b1, 3'b0};
+@@ -398,7 +399,7 @@
+ assign SS_MAP2_BACK[   20] = prg_invert;
+ assign SS_MAP2_BACK[63:21] = 43'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	// mirroring mode
+ 	casez(mirroring[1:0])
+ 		2'b00   :   vram_a10 = {chr_ain[10]};    // vertical
+@@ -1327,7 +1328,7 @@
+ 	input         Savestate_MAPRAMRdEn,    
+ 	input         Savestate_MAPRAMWrEn,    
+ 	input  [7:0]  Savestate_MAPRAMWriteData,
+-	output [7:0]  Savestate_MAPRAMReadData
++	output logic [7:0]  Savestate_MAPRAMReadData
+ );
+ 
+ assign prg_aout_b   = enable ? prg_aout : 22'hZ;
+@@ -1347,7 +1348,7 @@
+ wire prg_allow;
+ wire chr_allow;
+ wire [7:0] chr_dout;
+-wire vram_a10;
++logic vram_a10;
+ wire vram_ce;
+ wire irq;
+ wire [15:0] flags_out = {12'h0, 1'b1, 1'b0, prg_bus_write, has_chr_dout};
+@@ -1362,7 +1363,7 @@
+ reg [2:0] attributes;
+ reg [6:0] JIS_col;
+ reg [6:0] JIS_row;
+-wire [6:0] prg_tmp;
++logic [6:0] prg_tmp;
+ wire overdump = (flags[13:11] == 3'd5); // 256KB chr is an overdump; use alternate mapping
+ 
+ // Block RAM, otherwise we need to time multiplex..
+@@ -1459,7 +1460,7 @@
+ assign SS_MAP1_BACK[63:57] = 7'b0; // free to be used
+ assign SS_MAP2_BACK[63: 0] = 64'b0; // free to be used
+ 
+-always begin
++always @* begin
+ 	// mirroring mode
+ 	casez(mirroring[1])
+ 		1'b0   :   vram_a10 = {chr_ain[10]};    // vertical
+diff -ru a/rtl/nes.v b/rtl/nes.v
+--- a/rtl/nes.v	2026-09-26 15:45:25.083590289 -0700
++++ b/rtl/nes.v	2026-09-26 15:45:25.090888319 -0700
+@@ -1,3 +1,4 @@
++import regs_savestates::*; // Game Bub: don't rely on another file's $unit import
+ // Copyright (c) 2012-2013 Ludvig Strigeus
+ // This program is GPL Licensed. See COPYING for the full license.
+ 
+diff -ru a/rtl/ppu.sv b/rtl/ppu.sv
+--- a/rtl/ppu.sv	2026-09-26 15:45:25.083810364 -0700
++++ b/rtl/ppu.sv	2026-09-26 15:45:25.092660097 -0700
+@@ -204,11 +204,11 @@
+ assign evenframe = is_even_frame;
+ 
+ // Dendy is 291 to 310
+-wire [8:0] vblank_start_sl;
+-wire [8:0] vblank_end_sl;
+-wire [8:0] vsync_start_sl;
++logic [8:0] vblank_start_sl;
++logic [8:0] vblank_end_sl;
++logic [8:0] vsync_start_sl;
+ wire [8:0] last_sl;
+-wire skip_en;
++logic skip_en;
+ reg [3:0] rendering_sr;
+ 
+ always_comb begin
+@@ -511,7 +511,7 @@
+ 	input         Savestate_OAMRdEn,
+ 	input         Savestate_OAMWrEn,
+ 	input  [7:0]  Savestate_OAMWriteData,
+-	output [7:0]  Savestate_OAMReadData
++	output logic [7:0]  Savestate_OAMReadData
+ );
+ 
+ wire [63:0] SS_OAMEVAL;
+@@ -981,7 +981,7 @@
+ assign load = {load_pix1, load_pix2, load_x, load_attr};
+ assign load_in = {pix1_latch, pix2_latch, load_temp, load_temp[1:0], load_temp[5]};
+ 
+-wire [7:0] load_temp;
++logic [7:0] load_temp;
+ always_comb begin
+ 	case (count)
+ 		0: load_temp = temp_y;
+@@ -1213,7 +1213,7 @@
+ 	input w2006,
+ 	input r2007,
+ 	input w2007,
+-	output [5:0] new_color
++	output logic [5:0] new_color
+ );
+ 
+ always_comb begin
+@@ -1330,7 +1330,7 @@
+ 	input         write,            // write
+ 	output reg    nmi,              // one while inside vblank
+ 	output        vram_r,           // read from vram active
+-	output        vram_r_ex,        // use extra sprite address
++	output logic        vram_r_ex,        // use extra sprite address
+ 	output        vram_w,           // write to vram active
+ 	output [13:0] vram_addr,        // vram address
+ 	output [13:0] vram_a_ex,        // vram address for extra sprites
+@@ -1452,7 +1452,7 @@
+ 
+ wire clear_signal = is_pre_render_line;
+ 
+-wire [13:0] vram_a;
++logic [13:0] vram_a;
+ reg [7:0] vram_a_byte;
+ 
+ wire video_sync, video_burst, video_picture_n;
+diff -ru a/rtl/SOUND/OPLL/VM2413/controller.vhd b/rtl/SOUND/OPLL/VM2413/controller.vhd
+--- a/rtl/SOUND/OPLL/VM2413/controller.vhd	2026-09-26 15:45:25.082213175 -0700
++++ b/rtl/SOUND/OPLL/VM2413/controller.vhd	2026-09-26 15:45:25.086583789 -0700
+@@ -1,5 +1,5 @@
+ --
+--- Controller.vhd
++-- Controller.vhd (Game Bub: modified from NES_MiSTer copy for standard VHDL.)
+ -- The core controller module of VM2413
+ --
+ -- Copyright (c) 2006 Mitsutaka Okazaki (brezza@pokipoki.org)
+@@ -128,7 +128,7 @@
+     end component;
+ 
+     -- the array which caches instrument number of each channel.
+-    type inst_array is array (ch_type'range) of integer range 0 to 15;
++    type inst_array is array (ch_type'low to ch_type'high) of integer range 0 to 15; -- Game Bub: standard VHDL range
+     signal inst_cache : inst_array;
+ 
+     type kl_array is array (0 to 15) of std_logic_vector(5 downto 0);
+@@ -342,6 +342,7 @@
+                                     user_voice_tmp.rr := data(3 downto 0);
+                                     user_voice_wr <= '1';
+                                 end if;
++                            when others => null; -- Game Bub: 'others' for standard VHDL
+                         end case;
+ 
+                         user_voice_wdata <= user_voice_tmp;
+@@ -510,6 +511,7 @@
+                     end if;
+                 end if;
+ 
++                when others => null; -- Game Bub: 'others' for standard VHDL
+             end case;
+ 
+         end if; end if;
+diff -ru a/rtl/SOUND/OPLL/VM2413/envelopegenerator.vhd b/rtl/SOUND/OPLL/VM2413/envelopegenerator.vhd
+--- a/rtl/SOUND/OPLL/VM2413/envelopegenerator.vhd	2026-09-26 15:45:25.082242109 -0700
++++ b/rtl/SOUND/OPLL/VM2413/envelopegenerator.vhd	2026-09-26 15:45:25.086615509 -0700
+@@ -1,5 +1,6 @@
+ --
+ -- EnvelopeGenerator.vhd
++-- (Game Bub: modified from NES_MiSTer copy; case statements use 'when others'.)
+ -- The envelope generator module of VM2413
+ --
+ -- Copyright (c) 2006 Mitsutaka Okazaki (brezza@pokipoki.org)
+@@ -186,7 +187,7 @@
+                         when Release=>
+                             rm := '0'&rr;
+                             egtmp := ("00"&tl&"000000") + ("00"&egphase(22-1 downto 22-7-6));
+-                        when Finish =>
++                        when others => -- Finish (Game Bub: 'others' for standard VHDL)
+                             egtmp(egtmp'high downto egtmp'high -1) := "00";
+                             egtmp(egtmp'high-2 downto 0) := (others=>'1');
+                     end case;
+@@ -232,7 +233,7 @@
+                                 dphase(2 downto 0) := '1'&rks(1 downto 0);
+                                 dphase  := SHL(dphase, rm(3 downto 0) - '1');
+                                 egphase := egphase + dphase(egphase'range);
+-                            when Finish =>
++                            when others => -- Finish (Game Bub: 'others' for standard VHDL)
+                                 null;
+                         end case;
+ 
+@@ -252,7 +253,7 @@
+                             if( egphase(egphase'high downto egphase'high-4) >= "01111" ) then
+                                 egstate:= Finish;
+                             end if;
+-                        when Finish =>
++                        when others => -- Finish (Game Bub: 'others' for standard VHDL)
+                             egphase := (others => '1');
+                     end case;
+ 
+diff -ru a/rtl/SOUND/OPLL/VM2413/voicememory.vhd b/rtl/SOUND/OPLL/VM2413/voicememory.vhd
+--- a/rtl/SOUND/OPLL/VM2413/voicememory.vhd	2026-09-26 15:45:25.082600094 -0700
++++ b/rtl/SOUND/OPLL/VM2413/voicememory.vhd	2026-09-26 15:45:25.086993701 -0700
+@@ -51,7 +51,7 @@
+ 
+   -- The following array is mapped into a Single-Clock Synchronous RAM with two-read
+   -- addresses by Altera's QuartusII compiler.
+-  type VOICE_ARRAY_TYPE is array (VOICE_ID_TYPE'range) of VOICE_VECTOR_TYPE;
++  type VOICE_ARRAY_TYPE is array (VOICE_ID_TYPE'low to VOICE_ID_TYPE'high) of VOICE_VECTOR_TYPE; -- Game Bub: standard VHDL range
+   signal voices : VOICE_ARRAY_TYPE;
+ 
+   component VoiceRom port (
+diff -ru a/rtl/SOUND/OPLL/VM2413/voicerom.vhd b/rtl/SOUND/OPLL/VM2413/voicerom.vhd
+--- a/rtl/SOUND/OPLL/VM2413/voicerom.vhd	2026-09-26 15:45:25.082621995 -0700
++++ b/rtl/SOUND/OPLL/VM2413/voicerom.vhd	2026-09-26 15:45:25.087017556 -0700
+@@ -43,7 +43,7 @@
+ 
+ architecture RTL of VoiceRom is
+ 
+-  type VOICE_ARRAY_TYPE is array (VOICE_ID_TYPE'range) of VOICE_VECTOR_TYPE;
++  type VOICE_ARRAY_TYPE is array (VOICE_ID_TYPE'low to VOICE_ID_TYPE'high) of VOICE_VECTOR_TYPE; -- Game Bub: standard VHDL range
+   constant voices : VOICE_ARRAY_TYPE := (
+ --VRC7
+ --From nesdev.com
