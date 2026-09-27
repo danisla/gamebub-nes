@@ -6,12 +6,17 @@ A port of [NES_MiSTer](https://github.com/MiSTer-devel/NES_MiSTer) to the
 
 ## Install
 
-Requires Game Bub firmware with SD card core support (v1.1).
+Requires a rev 4 device, and Game Bub firmware with SD card core support
+(v1.1). Upstream v1.1.0-beta1 doesn't list SD card cores; use
+[v1.1-beta-fork-rc1](https://github.com/danisla/gamebub/releases/tag/v1.1-beta-fork-rc1),
+which is v1.1.0-beta1 with the fix.
 
-Copy `core/NES/` to `/cores/NES/` on the SD card, along with the bitstream
-built for your device (`nes_rev4.bit`, see below). NES / Famicom then appears
-in the core list. ROMs are `.nes` files; battery saves are stored next to the
-ROM as `.sav`.
+Download the core zip from the [latest
+release](https://github.com/danisla/gamebub-nes/releases/latest) and unzip it
+into `/cores/` on the SD card. Or copy `core/NES/` to `/cores/NES/`, along
+with the bitstream built for your device (`nes_rev4.bit`, see below). NES /
+Famicom then appears in the core list. ROMs are `.nes` files; battery saves
+are stored next to the ROM as `.sav`.
 
 ## Layout
 
