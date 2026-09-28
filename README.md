@@ -2,14 +2,14 @@
 
 A port of [NES_MiSTer](https://github.com/MiSTer-devel/NES_MiSTer) to the
 [Game Bub](https://gamebub.net/) handheld, built with the Game Bub framework
-(firmware v1.1). It runs as an SD card core.
+(firmware v1.1-beta2 or later). It runs as an SD card core.
 
 ## Install
 
-Requires a rev 4 device, and Game Bub firmware with SD card core support
-(v1.1). Upstream v1.1.0-beta1 doesn't list SD card cores; use
-[v1.1-beta-fork-rc1](https://github.com/danisla/gamebub/releases/tag/v1.1-beta-fork-rc1),
-which is v1.1.0-beta1 with the fix.
+Requires a rev 4 device with Game Bub firmware v1.1-beta2 or later (the
+first official firmware that lists SD card cores).
+The v1.1-beta2 firmware (`gamebub-rev4_v1.1-beta2.uf2`) is attached to the
+[latest release](https://github.com/danisla/gamebub-nes/releases/latest).
 
 Download the core zip from the [latest
 release](https://github.com/danisla/gamebub-nes/releases/latest) and unzip it
