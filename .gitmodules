@@ -1,3 +1,6 @@
 [submodule "nes_mister"]
 	path = nes_mister
 	url = https://github.com/MiSTer-devel/NES_MiSTer.git
+[submodule "framework"]
+	path = framework
+	url = https://github.com/gamebub/framework

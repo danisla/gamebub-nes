@@ -25,7 +25,8 @@ are stored next to the ROM as `.sav`.
 * `hdl/`: Game Bub glue: wrapper (`nes_gamebub.sv`), SDRAM controller,
   constraints.
 * `src/main/scala/nes/`: the Chisel core (clocks, host interface, video).
-* `framework/`: the Game Bub framework (unmodified).
+* `framework/`: the [Game Bub framework](https://github.com/gamebub/framework),
+  as a submodule (pinned).
 * `core/NES/`: SD card core definition (`core.json`, `files.json`,
   `settings.json`).
 
